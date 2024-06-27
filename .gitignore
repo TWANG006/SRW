@@ -22,5 +22,15 @@ docs/build/
 *.pyd
 
 .vscode/
+.vs/
+SRWLIB.tlog/
+Debug_cuda/
+Release_cuda/
 __srwl_logs__/
 uti_plot*.png
+*.obj
+*.sbr
+*.log
+*.pdb
+*.cache
+*.bsc
