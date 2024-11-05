@@ -733,27 +733,52 @@ public:
 	//void DetermineHyperboloidParamsInLocFrame(); //TW19012024 //OC06032024 (moved to .h from .cpp)
 	void DetermineHyperboloidParamsInLocFrame() 
 	{
-		// determine convex & concave and which part of the hyperboloid
-		m_isConvex = m_p > m_q ? true : false; // p>q, convex; p<q, concave; optical system sense
-		double z0_sign = m_vCenTang.z > 0 ? -1.0 : 1.0;  // t.z<0, z0>0; t.z>0, z0<0;
-
-		// determine the rotation angle from the Local to Local Normal frame
+		/* TW04112024
+		 determine the rotation angle from the local to local normal frame: 
+		 assuming rays are coming from east to west, the angle is only related to 
+		 p, q, and m_vCenTang.z
+		 p > q
+		     m_vCenTang.z < 0: angRot = -acuteAngRot
+		     m_vCenTang.z > 0: angRot = pi + acuteAngRot
+		 p < q
+		     m_vCenTang.z < 0: angRot = acuteAngRot
+		     m_vCenTang.z > 0: angRot = -pi - acuteAngRot
+		*/
+		// (Yashchuk et al., 2019)
 		double acuteAngRot = atan((m_p + m_q) * tan(m_angGraz) / fabs(m_p - m_q));
-		if(m_isConvex && z0_sign > 0 || !m_isConvex && z0_sign < 0) {
-			m_angRot = acuteAngRot;
+		if (m_p > m_q) {
+			m_angRot = m_vCenTang.z < 0 ? -acuteAngRot : PI + acuteAngRot;
 		}
 		else {
-			m_angRot = PI - acuteAngRot;
+			m_angRot = m_vCenTang.z < 0 ? acuteAngRot : -PI - acuteAngRot;
 		}
 		m_sinAngRotNormLoc = sin(m_angRot);
 		m_cosAngRotNormLoc = cos(m_angRot);
 
-		// determine the coordinate of the mirror center in the Local Normal frame
+		/* TW04112024
+		 determine the coordinate of the mirror center in the Local Normal frame
+		*/
+		// determine the sign (+-) of the x0, z0 based on convexity, p, q, and m_vCenTang.z
+		double z0_sign = 0, x0_sign = 0;
+		if (m_isConvex) {
+			z0_sign = m_vCenTang.z < 0 ? 1 : -1;
+			x0_sign = m_p > m_q ? -1 : 1;
+		}
+		else {
+			z0_sign = m_vCenTang.z < 0 ? -1 : 1;
+			x0_sign = m_p > m_q ? 1 : -1;
+		}
+		// calculate (x0, z0) in the local normal frame (Yashchuk et al., 2019)
 		double c = 0.5 * sqrt(m_q * m_q + m_p * m_p - 2 * m_q * m_p * cos(2 * m_angGraz));
-		double x0 = (m_q * m_q - m_p * m_p) / (4 * c);
+		double x0 = x0_sign * abs(m_q * m_q - m_p * m_p) / (4 * c);
 		double z0 = z0_sign * (m_q * m_p * sin(2 * m_angGraz)) / (2 * c);
 		m_xcLocNorm = x0;
 		m_zcLocNorm = z0;
+
+		// determine convex & concave and which part of the hyperboloid
+		//m_isConvex = m_p > m_q ? true : false; // p>q, convex; p<q, concave; optical system sense
+		//double z0_sign = m_vCenTang.z > 0 ? -1.0 : 1.0;  // t.z<0, z0>0; t.z>0, z0<0;
+
 	}
 
 
@@ -772,24 +797,33 @@ private:
 	//bool FindRayIntersectSol1(TVector3d& inP, TVector3d& inV, TVector3d& resP, TVector3d* pResN=0); //OC06032024 (moved to .h from .cpp)
 	bool FindRayIntersectSol1(TVector3d& inP, TVector3d& inV, TVector3d& resP, TVector3d* pResN=0) //TW19012024 //OC06032024 (moved to .h from .cpp)
 	{
-		// Coordinates of all points and vectors in the frame where the elipse is described by x^2/m_ax^2 - y^2/m_ay^2 - z^2/m_az^2 = 1:
+		/* TW04112024
+		* transform the coordinates of all points and vectors to the local normal frame where the hyperbola is described by x^2/m_ax^2 - y^2/m_ay^2 - z^2/m_az^2 = 1
+		*                        |cos(angRot)  -sin(angRot)   tx|
+		* transformation matrix: |sin(angRot)   cos(angRot)   tz|
+		*                        |     0              0        1|
+		*/
 		// Transform inP to the Local Normal frame
-		double x0 = m_xcLocNorm + inP.x * m_cosAngRotNormLoc + inP.z * m_sinAngRotNormLoc;
+		double x0 = m_xcLocNorm + m_cosAngRotNormLoc * inP.x - m_sinAngRotNormLoc * inP.z;
 		double y0 = inP.y;
-		double z0 = m_zcLocNorm - inP.x * m_sinAngRotNormLoc + inP.z * m_cosAngRotNormLoc;
+		double z0 = m_zcLocNorm + m_sinAngRotNormLoc * inP.x + m_cosAngRotNormLoc * inP.z;
 
 		// Transform inV to the Local Normal frame
-		double vx = inV.x * m_cosAngRotNormLoc + inV.z * m_sinAngRotNormLoc;
+		double vx = m_cosAngRotNormLoc * inV.x - m_sinAngRotNormLoc * inV.z;
 		double vy = inV.y;
-		double vz = -inV.x * m_sinAngRotNormLoc + inV.z * m_cosAngRotNormLoc;
+		double vz = m_sinAngRotNormLoc * inV.x + m_cosAngRotNormLoc * inV.z;
 
-		// calculate t
+		/* TW04112024
+		* determine the intersection (xi, yi) of the line and the hyperbola in the local normal frame
+		* line: xi = xp + t*vx, yi = yp + t*vy, zi = zp + t*vz
+		*/
+		// 1. determine if there is an intersection
 		double A = m_ayE2 * m_azE2 * vx * vx - m_axE2 * m_azE2 * vy * vy - m_axE2 * m_ayE2 * vz * vz;
 		double B = 2 * (m_ayE2 * m_azE2 * x0 * vx - m_axE2 * m_azE2 * y0 * vy - m_axE2 * m_ayE2 * vz * z0);
 		double C = m_ayE2 * m_azE2 * x0 * x0 - m_axE2 * m_azE2 * y0 * y0 - m_axE2 * m_ayE2 * z0 * z0 - m_axE2 * m_ayE2 * m_azE2;
 		double Delta = B * B - 4 * A * C;
 
-		// no intersection at all
+		// if Delta < 0, no intersection at all
 		if(Delta < 0) {
 			return false;
 		}
@@ -844,7 +878,8 @@ private:
 		return true;
 	}
 
-	/* Solution 2: directly resolving from in the local frame*/
+	/* TW04112024
+	Solution 2: directly resolving from in the local frame
 	//bool FindRayIntersectSol2(TVector3d& inP, TVector3d& inV, TVector3d& resP, TVector3d* pResN=0);
 	bool FindRayIntersectSol2(TVector3d &inP, TVector3d &inV, TVector3d &resP, TVector3d *pResN=0) //TW19012024 //OC06032024 (moved to .h from .cpp)
 	{
@@ -863,7 +898,7 @@ private:
 		}
 		return true;
 	}
-
+	*/
 	// this is the function for generating the z of an hyperboloid in local frame
 	//double HyperboloidHeight(double x, double y = 0);
 	double HyperboloidHeight(double x, double y=0) //TW19012024 //OC06032024 (moved to .h from .cpp)
@@ -903,52 +938,54 @@ private:
 		return (-B + root_sign * sqrt(B * B - 4 * A * C)) / (2 * A);
 	}
 
+	/* TW04112024
 	// calculates the t for the intersection (px+t*vx, py+t*vy, pz+t*vz)
 	//bool Calculate_t(const TVector3d &inP, const TVector3d &inV, double &t);
-	bool Calculate_t(const TVector3d &inP, const TVector3d &inV, double &t) //TW19012024 //OC06032024 (moved to .h from .cpp)
-	{
-		// just for less typing
-		double vx = inV.x, vy = inV.y, vz = inV.z;
-		double px = inP.x, py = inP.y, pz = inP.z;
+	//bool Calculate_t(const TVector3d &inP, const TVector3d &inV, double &t) //TW19012024 //OC06032024 (moved to .h from .cpp)
+	//{
+	//	// just for less typing
+	//	double vx = inV.x, vy = inV.y, vz = inV.z;
+	//	double px = inP.x, py = inP.y, pz = inP.z;
 
-		double cosAngGraz = cos(m_angGraz), sinAngGraz = sin(m_angGraz); //OC06032024
+	//	double cosAngGraz = cos(m_angGraz), sinAngGraz = sin(m_angGraz); //OC06032024
 
-		// just for less typing
-		double A = cosAngGraz * cosAngGraz - (4 * m_p * m_q * sinAngGraz * sinAngGraz) / ((m_q - m_p) * (m_q - m_p)); //OC06032024
-		//double A = cos(m_angGraz) * cos(m_angGraz) - (4 * m_p * m_q * sin(m_angGraz) * sin(m_angGraz)) / ((m_q - m_p) * (m_q - m_p));
-		double D = sinAngGraz / (m_q - m_p) * (m_p + m_q) * cosAngGraz; //OC06032024
-		//double D = sin(m_angGraz) / (m_q - m_p) * (m_p + m_q) * cos(m_angGraz);
-		double E = sinAngGraz / (m_q - m_p) * m_p * m_q; //OC06032024
-		//double E = sin(m_angGraz) / (m_q - m_p) * m_p * m_q;
+	//	// just for less typing
+	//	double A = cosAngGraz * cosAngGraz - (4 * m_p * m_q * sinAngGraz * sinAngGraz) / ((m_q - m_p) * (m_q - m_p)); //OC06032024
+	//	//double A = cos(m_angGraz) * cos(m_angGraz) - (4 * m_p * m_q * sin(m_angGraz) * sin(m_angGraz)) / ((m_q - m_p) * (m_q - m_p));
+	//	double D = sinAngGraz / (m_q - m_p) * (m_p + m_q) * cosAngGraz; //OC06032024
+	//	//double D = sin(m_angGraz) / (m_q - m_p) * (m_p + m_q) * cos(m_angGraz);
+	//	double E = sinAngGraz / (m_q - m_p) * m_p * m_q; //OC06032024
+	//	//double E = sin(m_angGraz) / (m_q - m_p) * m_p * m_q;
 
-		// Dt^2 + Et + F = 0
-		double F = A * vz * vz - 2 * D * vx * vz + sinAngGraz * sinAngGraz * vx * vx + vy * vy; //OC06032024
-		//double F = A * vz * vz - 2 * D * vx * vz + sin(m_angGraz) * sin(m_angGraz) * vx * vx + vy * vy;
-		double G = 2 * (A * pz * vz - D * (pz * vx + px * vz) - 2 * E * vz + sinAngGraz * sinAngGraz * px * vx + py * vy); //OC06032024
-		//double G = 2 * (A * pz * vz - D * (pz * vx + px * vz) - 2 * E * vz + sin(m_angGraz) * sin(m_angGraz) * px * vx + py * vy);
-		double H = A * pz * pz - 2 * D * px * pz - 4 * E * pz + sinAngGraz * sinAngGraz * px * px + py * py; //OC06032024
-		//double H = A * pz * pz - 2 * D * px * pz - 4 * E * pz + sin(m_angGraz) * sin(m_angGraz) * px * px + py * py;
+	//	// Dt^2 + Et + F = 0
+	//	double F = A * vz * vz - 2 * D * vx * vz + sinAngGraz * sinAngGraz * vx * vx + vy * vy; //OC06032024
+	//	//double F = A * vz * vz - 2 * D * vx * vz + sin(m_angGraz) * sin(m_angGraz) * vx * vx + vy * vy;
+	//	double G = 2 * (A * pz * vz - D * (pz * vx + px * vz) - 2 * E * vz + sinAngGraz * sinAngGraz * px * vx + py * vy); //OC06032024
+	//	//double G = 2 * (A * pz * vz - D * (pz * vx + px * vz) - 2 * E * vz + sin(m_angGraz) * sin(m_angGraz) * px * vx + py * vy);
+	//	double H = A * pz * pz - 2 * D * px * pz - 4 * E * pz + sinAngGraz * sinAngGraz * px * px + py * py; //OC06032024
+	//	//double H = A * pz * pz - 2 * D * px * pz - 4 * E * pz + sin(m_angGraz) * sin(m_angGraz) * px * px + py * py;
 
-		// determinant
-		double Delta = G * G - 4 * F * H;
-		if(Delta < 0) {
-			t = 0;
-			return false;
-		}
+	//	// determinant
+	//	double Delta = G * G - 4 * F * H;
+	//	if(Delta < 0) {
+	//		t = 0;
+	//		return false;
+	//	}
 
-		// solve the equation and select the correct t
-		double sqrtDelta = sqrt(Delta); //OC06032024
-		double t1 = (-G + sqrtDelta) / (2 * F); //OC06032024
-		//double t1 = (-G + sqrt(Delta)) / (2 * F);
-		double t2 = (-G - sqrtDelta) / (2 * F); //OC06032024
-		//double t2 = (-G - sqrt(Delta)) / (2 * F);
+	//	// solve the equation and select the correct t
+	//	double sqrtDelta = sqrt(Delta); //OC06032024
+	//	double t1 = (-G + sqrtDelta) / (2 * F); //OC06032024
+	//	//double t1 = (-G + sqrt(Delta)) / (2 * F);
+	//	double t2 = (-G - sqrtDelta) / (2 * F); //OC06032024
+	//	//double t2 = (-G - sqrt(Delta)) / (2 * F);
 
-		// validate & select the correct t solution
-		if(!Which_t(inP, inV, t1, t2, t)) {
-			return false;
-		}
-		return true;
-	}
+	//	// validate & select the correct t solution
+	//	if(!Which_t(inP, inV, t1, t2, t)) {
+	//		return false;
+	//	}
+	//	return true;
+	//}
+	*/
 
 	// validate t
 	//bool Validate_t(const TVector3d& inP, const TVector3d& inV, const double& t);
