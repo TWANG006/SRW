@@ -34,3 +34,7 @@ uti_plot*.png
 *.pdb
 *.cache
 *.bsc
+*.tlog
+*.iobj
+*.recipe
+*.exp

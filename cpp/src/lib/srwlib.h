@@ -479,6 +479,7 @@ struct SRWLStructOpticsMirrorHyperboloid { //TW19012014
 	double p, q; /* distance [m] from first focus ('source') to mirror center, and from center to second focus ('image') */
 	double angGraz; /* grazing angle [rad] at mirror center at perfect orientation */
 	double radSag; /* sagital radius of curvature [m] at mirror center */
+	bool is_convex; /* use the convex or concave side TW06112024*/
 	SRWLOptMir baseMir; /* general information about the mirror */
 };
 typedef struct SRWLStructOpticsMirrorHyperboloid SRWLOptMirHyp; //TW19012014

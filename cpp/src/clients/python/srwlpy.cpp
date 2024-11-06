@@ -2346,6 +2346,13 @@ void ParseSructSRWLOptMirExtHyp(SRWLOptMirHyp* pOpt, PyObject* oOpt) //throw(...
 	if(!PyNumber_Check(o_tmp)) throw strEr_BadOptMir;
 	pOpt->radSag = PyFloat_AsDouble(o_tmp);
 	Py_DECREF(o_tmp);
+
+	//TW06112024: adding convexity
+	o_tmp = PyObject_GetAttrString(oOpt, "isConvex");
+	if (o_tmp == 0) throw strEr_BadOptMir;
+	if (!PyBool_Check(o_tmp)) throw strEr_BadOptMir;
+	pOpt->is_convex = PyObject_IsTrue(o_tmp);
+	Py_DECREF(o_tmp);
 }
 
 /************************************************************************//**

@@ -878,114 +878,88 @@ private:
 		return true;
 	}
 
-	/* TW04112024
-	Solution 2: directly resolving from in the local frame
-	//bool FindRayIntersectSol2(TVector3d& inP, TVector3d& inV, TVector3d& resP, TVector3d* pResN=0);
-	bool FindRayIntersectSol2(TVector3d &inP, TVector3d &inV, TVector3d &resP, TVector3d *pResN=0) //TW19012024 //OC06032024 (moved to .h from .cpp)
-	{
-		double t = 0;
-		if(!Calculate_t(inP, inV, t)) {
-			return false;
-		}
-
-		resP.x = inP.x + t * inV.x;
-		resP.y = inP.y + t * inV.y;
-		resP.z = inP.z + t * inV.z;
-
-		if(pResN != 0) {
-			// TODO
-			;
-		}
-		return true;
-	}
-	*/
+	// TW06112024
 	// this is the function for generating the z of an hyperboloid in local frame
 	//double HyperboloidHeight(double x, double y = 0);
-	double HyperboloidHeight(double x, double y=0) //TW19012024 //OC06032024 (moved to .h from .cpp)
+	double HyperboloidHeight(double x, double y = 0) //TW19012024 //OC06032024 (moved to .h from .cpp)
 	{
 		// deal with cylindrical hyperbola
 		y = m_isCylinder ? 0 : y;
 	
 		// deal with convex or concave
-		double root_sign = -1;
-		if(m_p > m_q) // convex case
-		{
-			root_sign = 1;
-			//if (m_vCenTang.z < 0) // bottom
-			//{
-			//	x = -x;
-			//}
+		if (m_isConvex) {
+			if (m_p > m_q) {
+				if (m_vCenTang.z < 0) { 
+					return HyperboloidHeightZ4(x, y);
+				}
+				else {
+					return HyperboloidHeightZ3(x, y);
+				}
+			}
+			else {
+				if (m_vCenTang.z < 0) {
+					return HyperboloidHeightZ1(x, y);
+				}
+				else {
+					return HyperboloidHeightZ2(x, y);
+				}
+			}
 		}
-		else // concave case 
-		{
-			root_sign = -1;
-			//if (m_vCenTang.z < 0) // top
-			//{
-			//	x = -x;
-			//}
+		else {
+			if (m_p > m_q) {
+				if (m_vCenTang.z < 0) {
+					return HyperboloidHeightZ1(x, y);
+				}
+				else {
+					return HyperboloidHeightZ2(x, y);
+				}
+			}
+			else {
+				if (m_vCenTang.z < 0) {
+					return HyperboloidHeightZ4(x, y);
+				}
+				else {
+					return HyperboloidHeightZ3(x, y);
+				}
+			}
 		}
-	
-		// z(x,y) = Az^2 + Bz + C
-		double cosAngGraz = cos(m_angGraz), sinAngGraz = sin(m_angGraz); //OC06032024
-		
-		double A = cosAngGraz*cosAngGraz - (4 * m_p * m_q * sinAngGraz*sinAngGraz) / ((m_q - m_p) * (m_q - m_p)); //OC06032024
-		//double A = cos(m_angGraz) * cos(m_angGraz) - (4 * m_p * m_q * sin(m_angGraz) * sin(m_angGraz)) / ((m_q - m_p) * (m_q - m_p));
-		double B = -(2 * sinAngGraz) / (m_q - m_p) * (2 * m_p * m_q + (m_p + m_q) * cosAngGraz * x); //OC06032024
-		//double B = -(2 * sin(m_angGraz)) / (m_q - m_p) * (2 * m_p * m_q + (m_p + m_q) * cos(m_angGraz) * x);
-		double C = y * y + sinAngGraz*sinAngGraz * x * x; //OC06032024
-		//double C = y * y + sin(m_angGraz) * sin(m_angGraz) * x * x;
-	
-		return (-B + root_sign * sqrt(B * B - 4 * A * C)) / (2 * A);
 	}
 
-	/* TW04112024
-	// calculates the t for the intersection (px+t*vx, py+t*vy, pz+t*vz)
-	//bool Calculate_t(const TVector3d &inP, const TVector3d &inV, double &t);
-	//bool Calculate_t(const TVector3d &inP, const TVector3d &inV, double &t) //TW19012024 //OC06032024 (moved to .h from .cpp)
-	//{
-	//	// just for less typing
-	//	double vx = inV.x, vy = inV.y, vz = inV.z;
-	//	double px = inP.x, py = inP.y, pz = inP.z;
+	// TW06112024
+	double HyperboloidHeightZ1(double x, double y = 0)
+	{
+		// z(x,y) = Az^2 + Bz + C
+		double cosAngGraz = cos(m_angGraz), sinAngGraz = sin(m_angGraz); //OC06032024
+		double A = cosAngGraz * cosAngGraz - (4 * m_p * m_q * sinAngGraz * sinAngGraz) / ((m_q - m_p) * (m_q - m_p)); //OC06032024
+		double B = -(2 * sinAngGraz) / (m_p - m_q) * (2 * m_p * m_q + (m_p + m_q) * cosAngGraz * x); //TW06112024
+		double C = y * y + sinAngGraz * sinAngGraz * x * x; //OC06032024
 
-	//	double cosAngGraz = cos(m_angGraz), sinAngGraz = sin(m_angGraz); //OC06032024
+		if (m_p < m_q) {
+			return (-B + sqrt(B * B - 4 * A * C)) / (2 * A);
+		}
+		else {
+			return (-B - sqrt(B * B - 4 * A * C)) / (2 * A);
+		}
+		
+	}
 
-	//	// just for less typing
-	//	double A = cosAngGraz * cosAngGraz - (4 * m_p * m_q * sinAngGraz * sinAngGraz) / ((m_q - m_p) * (m_q - m_p)); //OC06032024
-	//	//double A = cos(m_angGraz) * cos(m_angGraz) - (4 * m_p * m_q * sin(m_angGraz) * sin(m_angGraz)) / ((m_q - m_p) * (m_q - m_p));
-	//	double D = sinAngGraz / (m_q - m_p) * (m_p + m_q) * cosAngGraz; //OC06032024
-	//	//double D = sin(m_angGraz) / (m_q - m_p) * (m_p + m_q) * cos(m_angGraz);
-	//	double E = sinAngGraz / (m_q - m_p) * m_p * m_q; //OC06032024
-	//	//double E = sin(m_angGraz) / (m_q - m_p) * m_p * m_q;
+	// TW06112024
+	double HyperboloidHeightZ2(double x, double y = 0)
+	{
+		return HyperboloidHeightZ1(-x, y);
+	}
 
-	//	// Dt^2 + Et + F = 0
-	//	double F = A * vz * vz - 2 * D * vx * vz + sinAngGraz * sinAngGraz * vx * vx + vy * vy; //OC06032024
-	//	//double F = A * vz * vz - 2 * D * vx * vz + sin(m_angGraz) * sin(m_angGraz) * vx * vx + vy * vy;
-	//	double G = 2 * (A * pz * vz - D * (pz * vx + px * vz) - 2 * E * vz + sinAngGraz * sinAngGraz * px * vx + py * vy); //OC06032024
-	//	//double G = 2 * (A * pz * vz - D * (pz * vx + px * vz) - 2 * E * vz + sin(m_angGraz) * sin(m_angGraz) * px * vx + py * vy);
-	//	double H = A * pz * pz - 2 * D * px * pz - 4 * E * pz + sinAngGraz * sinAngGraz * px * px + py * py; //OC06032024
-	//	//double H = A * pz * pz - 2 * D * px * pz - 4 * E * pz + sin(m_angGraz) * sin(m_angGraz) * px * px + py * py;
+	// TW06112024
+	double HyperboloidHeightZ3(double x, double y = 0)
+	{
+		return -HyperboloidHeightZ1(x, y);
+	}
 
-	//	// determinant
-	//	double Delta = G * G - 4 * F * H;
-	//	if(Delta < 0) {
-	//		t = 0;
-	//		return false;
-	//	}
-
-	//	// solve the equation and select the correct t
-	//	double sqrtDelta = sqrt(Delta); //OC06032024
-	//	double t1 = (-G + sqrtDelta) / (2 * F); //OC06032024
-	//	//double t1 = (-G + sqrt(Delta)) / (2 * F);
-	//	double t2 = (-G - sqrtDelta) / (2 * F); //OC06032024
-	//	//double t2 = (-G - sqrt(Delta)) / (2 * F);
-
-	//	// validate & select the correct t solution
-	//	if(!Which_t(inP, inV, t1, t2, t)) {
-	//		return false;
-	//	}
-	//	return true;
-	//}
-	*/
+	// TW06112024
+	double HyperboloidHeightZ4(double x, double y = 0)
+	{
+		return -HyperboloidHeightZ1(-x, y);
+	}
 
 	// validate t
 	//bool Validate_t(const TVector3d& inP, const TVector3d& inV, const double& t);
@@ -996,26 +970,14 @@ private:
 		//{
 		//	return false;
 		//}
-
 		double xi = inP.x + t * inV.x;
 		double yi = inP.y + t * inV.y;
 		double zi = inP.z + t * inV.z;
 
-		// calculate the zi on the hyperboloid using xi and yi
-		double zi_calc = 0;
-		if(!m_isConvex && m_vCenTang.z >= 0) {
-			zi_calc = HyperboloidHeight(xi, yi);
-		}
-		else if(!m_isConvex && m_vCenTang.z < 0) {
-			zi_calc = HyperboloidHeight(-xi, yi);
-		}
-		else if(m_isConvex && m_vCenTang.z >= 0) {
-			zi_calc = -HyperboloidHeight(xi, yi);
-		}
-		else {
-			zi_calc = -HyperboloidHeight(-xi, yi);
-		}
-
+		// calculate the zi_calc on the hyperboloid using xi and yi
+		double zi_calc = HyperboloidHeight(xi, yi);
+		
+		// determine if (xi, yi, zi_calc) is on the hyperboloid
 		bool is_xiyi = (-m_halfDim1 <= xi && xi <= m_halfDim1 && -m_halfDim2 <= yi && yi <= m_halfDim2);
 		bool is_zi = (zi - zi_calc) < 1e-12;
 
