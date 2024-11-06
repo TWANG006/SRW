@@ -3507,10 +3507,10 @@ class SRWLOptMirEl(SRWLOptMir):
                      _refl, _n_ph_en, _n_ang, _n_comp, _ph_en_start, _ph_en_fin, _ph_en_scale_type, _ang_start, _ang_fin, _ang_scale_type)
 
 class SRWLOptMirHyp(SRWLOptMir):
-    """Optical Element: Mirror: Hyperboloid #TW24012024
+    """Optical Element: Mirror: Hyperboloid #TW06112024
        NOTE: in the Local frame of the Mirror tangential direction is X, saggital Y, mirror normal is along Z"""
     
-    def __init__(self, _p=1, _q=1, _ang_graz=1e-03, _r_sag=1.e+23,
+    def __init__(self, _p=1, _q=1, _ang_graz=1e-03, _r_sag=1.e+23, _is_convex=True,
                  _size_tang=1, _size_sag=1, _ap_shape='r', _sim_meth=2, _npt=500, _nps=500, _treat_in_out=1, _ext_in=0, _ext_out=0,
                  _nvx=0, _nvy=0, _nvz=-1, _tvx=1, _tvy=0, _x=0, _y=0,
                  _refl=1, _n_ph_en=1, _n_ang=1, _n_comp=1, _ph_en_start=1000., _ph_en_fin=1000., _ph_en_scale_type='lin', _ang_start=0, _ang_fin=0, _ang_scale_type='lin'):
@@ -3519,6 +3519,7 @@ class SRWLOptMirHyp(SRWLOptMir):
         :param _q: distance from mirror center to second focus (\"image\") [m]
         :param _ang_graz: grazing angle at mirror center at perfect orientation [rad]
         :param _r_sag: sagital radius of curvature at mirror center [m]
+        :param _is_convex: use the convex of concave side of the hyperboloid
         :param _size_tang: size in tangential direction [m]
         :param _size_sag: size in sagital direction [m]
         :param _ap_shape: shape of aperture in local frame ('r' for rectangular, 'e' for elliptical)
@@ -3554,6 +3555,7 @@ class SRWLOptMirHyp(SRWLOptMir):
         self.q = _q
         self.angGraz = _ang_graz
         self.radSag = _r_sag
+        self.isConvex = _is_convex;
         
         #finishing of the mirror setup requires calling these 3 functions (with their required arguments):
         #self.set_dim_sim_meth(_size_tang, _size_sag, _ap_shape, _sim_meth, _npt, _nps, _treat_in_out, _ext_in, _ext_out)
